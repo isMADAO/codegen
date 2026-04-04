@@ -68,6 +68,27 @@ public class SchemaGenerator : BaseGenerator
 
             Progress.Report($"Loaded Entity System with {entitySystemData!.EntityClasses.Count} entity classes.");
 
+            var customEntitySystemPath = Path.Combine(_schemasPath, "entitysystem_custom.json");
+            if (File.Exists(customEntitySystemPath))
+            {
+                var customEntitySystemContent = await File.ReadAllTextAsync(customEntitySystemPath);
+                var customEntitySystemData = JsonSerializer.Deserialize<EntitySystem>(customEntitySystemContent);
+
+                if (customEntitySystemData?.EntityClasses != null)
+                {
+                    var existingClassNames = new HashSet<string>(entitySystemData.EntityClasses.Select(ec => ec.ClassName));
+                    foreach (var customClass in customEntitySystemData.EntityClasses)
+                    {
+                        if (existingClassNames.Contains(customClass.ClassName))
+                        {
+                            entitySystemData.EntityClasses.RemoveAll(ec => ec.ClassName == customClass.ClassName);
+                        }
+                        entitySystemData.EntityClasses.Add(customClass);
+                    }
+                    Progress.Report($"Merged {customEntitySystemData.EntityClasses.Count} custom entity classes. Total: {entitySystemData.EntityClasses.Count}");
+                }
+            }
+
             var allClassNames = sdkData.Classes.Select(c => c.Name.Replace(":", "_")).ToList();
             var allEnumNames = sdkData.Enums.Select(e => e.Name.Replace(":", "_")).ToList();
 

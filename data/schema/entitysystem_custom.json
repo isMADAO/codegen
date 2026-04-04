@@ -1,0 +1,8 @@
+{
+    "entity_classes": [
+        {
+            "class_name": "CPropDoorRotating",
+            "designer_name": "prop_door_rotating"
+        }
+    ]
+}
