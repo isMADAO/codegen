@@ -44,7 +44,7 @@ public class Natives : BaseGenerator
 
         DelegateReturnTypeMap = new Dictionary<string, string>(ParamTypeMap)
         {
-            ["string"] = "int",
+            ["string"] = "byte*",
             ["bytes"] = "int",
             ["bool"] = "byte"
         };
@@ -200,9 +200,19 @@ public class Natives : BaseGenerator
             }
         }
 
-        var delegateParamTypes = IsBufferReturn(returnType)
-            ? new[] { "byte*" }.Concat(nativeParamTypes).ToList()
-            : nativeParamTypes;
+        List<string> delegateParamTypes;
+        if (returnType == "string")
+        {
+            delegateParamTypes = new[] { "int*" }.Concat(nativeParamTypes).ToList();
+        }
+        else if (IsBufferReturn(returnType))
+        {
+            delegateParamTypes = new[] { "byte*" }.Concat(nativeParamTypes).ToList();
+        }
+        else
+        {
+            delegateParamTypes = nativeParamTypes;
+        }
 
         var delegateGeneric = string.Join(", ", delegateParamTypes.Append(DelegateReturnTypeMap[returnType]));
 
@@ -310,40 +320,35 @@ public class Natives : BaseGenerator
     private void WriteNativeCall(CodeWriter writer, string returnType, string functionName,
         List<(string type, string name)> nativeParams)
     {
-        if (IsBufferReturn(returnType))
+        if (returnType == "string")
+        {
+            writer.AddLine("var length = 0;");
+            var callArgs = new List<string> { "&length" };
+            callArgs.AddRange(BuildCallArgs(nativeParams));
+            writer.AddLine($"var returnedPtr = _{functionName}({string.Join(", ", callArgs)});");
+            writer.AddLine("var outString = StringAlloc.CreateCSharpString((nint)returnedPtr, length);");
+            writer.AddLine("NativeAllocator.Free((nint)returnedPtr);");
+            writer.AddLine("return outString;");
+        }
+        else if (IsBufferReturn(returnType))
         {
             var firstCallArgs = new List<string> { "null" };
             firstCallArgs.AddRange(BuildCallArgs(nativeParams));
             writer.AddLine($"var ret = _{functionName}({string.Join(", ", firstCallArgs)});");
+            writer.AddLine("var pool = ArrayPool<byte>.Shared;");
+            writer.AddLine("var retBuffer = pool.Rent(ret + 1);");
 
-            if (returnType == "string")
+            writer.AddBlock("fixed (byte* retBufferPtr = retBuffer)", () =>
             {
-                writer.AddLine("return StringAlloc.CreateCSharpString(ret, retBufferPtr =>");
-                writer.AddLine("{");
-                writer.Indent();
-                var secondCallArgs = new List<string> { "(byte*)retBufferPtr" };
+                var secondCallArgs = new List<string> { "retBufferPtr" };
                 secondCallArgs.AddRange(BuildCallArgs(nativeParams));
-                writer.AddLine($"_ = _{functionName}({string.Join(", ", secondCallArgs)});");
-                writer.Dedent();
-                writer.AddLine("});");
-            }
-            else
-            {
-                writer.AddLine("var pool = ArrayPool<byte>.Shared;");
-                writer.AddLine("var retBuffer = pool.Rent(ret + 1);");
+                writer.AddLine($"ret = _{functionName}({string.Join(", ", secondCallArgs)});");
 
-                writer.AddBlock("fixed (byte* retBufferPtr = retBuffer)", () =>
-                {
-                    var secondCallArgs = new List<string> { "retBufferPtr" };
-                    secondCallArgs.AddRange(BuildCallArgs(nativeParams));
-                    writer.AddLine($"ret = _{functionName}({string.Join(", ", secondCallArgs)});");
-
-                    writer.AddLine("var retBytes = new byte[ret];");
-                    writer.AddLine("for (int i = 0; i < ret; i++) retBytes[i] = retBufferPtr[i];");
-                    writer.AddLine("pool.Return(retBuffer);");
-                    writer.AddLine("return retBytes;");
-                });
-            }
+                writer.AddLine("var retBytes = new byte[ret];");
+                writer.AddLine("for (int i = 0; i < ret; i++) retBytes[i] = retBufferPtr[i];");
+                writer.AddLine("pool.Return(retBuffer);");
+                writer.AddLine("return retBytes;");
+            });
         }
         else
         {
@@ -416,7 +421,7 @@ public class Natives : BaseGenerator
         return result;
     }
 
-    private static bool IsBufferReturn(string returnType) => returnType == "string" || returnType == "bytes";
+    private static bool IsBufferReturn(string returnType) => returnType == "bytes";
 
     private static (string prefix, string className) SplitByLastDot(string value)
     {

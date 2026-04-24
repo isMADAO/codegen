@@ -38,10 +38,17 @@ public static class Entrypoint
         string? protobufsPath = null;
         string? datamapsPath = null;
         string? schemaPath = null;
+        string? steamworksPath = null;
+        string? game = null;
 
         for (int i = 0; i < args.Length; i++)
         {
-            if ((args[i] == "--natives-path" || args[i] == "-n") && i + 1 < args.Length)
+            if ((args[i] == "--game" || args[i] == "-game") && i + 1 < args.Length)
+            {
+                game = args[i + 1];
+                i++;
+            }
+            else if ((args[i] == "--natives-path" || args[i] == "-n") && i + 1 < args.Length)
             {
                 nativesPath = args[i + 1];
                 i++;
@@ -66,6 +73,11 @@ public static class Entrypoint
                 schemaPath = args[i + 1];
                 i++;
             }
+            else if ((args[i] == "--steamworks-path" || args[i] == "-s") && i + 1 < args.Length)
+            {
+                steamworksPath = args[i + 1];
+                i++;
+            }
             else if (args[i] == "--help" || args[i] == "-h")
             {
                 ShowHelp();
@@ -73,18 +85,22 @@ public static class Entrypoint
             }
         }
 
-        var gameChoice = AnsiConsole.Prompt(
-            new SelectionPrompt<string>().Title("Select the [green]game[/] to generate Swiftly:Source2 files:")
-                .AddChoices(["Counter-Strike: 2"])
-        );
+        if (game == null)
+        {
+            game = AnsiConsole.Prompt(
+                new SelectionPrompt<string>().Title("Select the [green]game[/] to generate Swiftly:Source2 files:")
+                    .AddChoices(["Counter-Strike: 2"])
+            );
+        }
 
-        AnsiConsole.MarkupLine($"Generating Swiftly:Source2 files for [green]{gameChoice}[/]...");
+        AnsiConsole.MarkupLine($"Generating Swiftly:Source2 files for [green]{game}[/]...");
         AnsiConsole.WriteLine();
 
-        switch (gameChoice)
+        switch (game)
         {
             case "Counter-Strike: 2":
-                await CS2.GeneratorOptions.ShowGeneratorOptionsAsync(nativesPath, gameEventsPath, protobufsPath, datamapsPath, schemaPath);
+            case "cs2":
+                await CS2.GeneratorOptions.ShowGeneratorOptionsAsync(nativesPath, gameEventsPath, protobufsPath, datamapsPath, schemaPath, steamworksPath);
                 break;
             default:
                 AnsiConsole.MarkupLine("[red]Error:[/] Unknown game selected.");
@@ -105,11 +121,12 @@ public static class Entrypoint
         AnsiConsole.MarkupLine("  -p, --protobufs-path <path>    Path to the protobufs folder");
         AnsiConsole.MarkupLine("  -d, --datamaps-path <path>     Path to the datamaps.json file");
         AnsiConsole.MarkupLine("  -schema, --schema-path <path>  Path to the schema folder");
+        AnsiConsole.MarkupLine("  -s, --steamworks-path <path>   Path to the steam_api.json file");
         AnsiConsole.MarkupLine("  -h, --help                     Show this help message");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  SwiftlyS2.Codegen --natives-path C:\\path\\to\\natives");
-        AnsiConsole.MarkupLine("  SwiftlyS2.Codegen -n C:\\path\\to\\natives -g C:\\path\\to\\gameevents");
+        AnsiConsole.MarkupLine("  SwiftlyS2.Codegen -n C:\\path\\to\\natives -g C:\\path\\to\\gameevents -s C:\\path\\to\\steam_api.json");
     }
 
     public static string BrowseForDirectory(string title, string? defaultPath = null)

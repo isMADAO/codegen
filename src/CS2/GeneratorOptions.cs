@@ -10,25 +10,61 @@ public static class GeneratorOptions
     /// <summary>
     /// Dictionary of available generators mapped by their display name
     /// </summary>
-    private static readonly Dictionary<string, Func<string?, string?, string?, string?, string?, BaseGenerator>> GeneratorFactories = new()
+    private static readonly Dictionary<string, Func<string?, string?, string?, string?, string?, string?, BaseGenerator>> GeneratorFactories = new()
     {
-        { "Natives", (nativesPath, _, _, _, _) => new Natives(nativesPath) },
-        { "Game Events", (_, gameEventsPath, _, _, _) => new GameEvents(gameEventsPath) },
-        { "Protobufs", (_, _, protobufsPath, _, _) => new Protobufs(protobufsPath) },
-        { "Datamaps", (_, _, _, datamapsPath, _) => new Datamaps(datamapsPath!) },
-        { "Schemas", (_, _, _, _, schemaPath) => new SchemaGenerator(schemaPath!) }
+        { "Natives", (nativesPath, _, _, _, _, _) => new Natives(nativesPath) },
+        { "Game Events", (_, gameEventsPath, _, _, _, _) => new GameEvents(gameEventsPath) },
+        { "Protobufs", (_, _, protobufsPath, _, _, _) => new Protobufs(protobufsPath) },
+        { "Datamaps", (_, _, _, datamapsPath, _, _) => new Datamaps(datamapsPath!) },
+        { "Schemas", (_, _, _, _, schemaPath, _) => new SchemaGenerator(schemaPath!) },
+        // { "Steamworks", (_, _, _, _, _, steamworksPath) => new SteamworksGenerator(steamworksPath) }
     };
 
-    public static async Task ShowGeneratorOptionsAsync(string? nativesPath, string? gameEventsPath, string? protobufsPath = null, string? datamapsPath = null, string? schemaPath = null)
+    public static async Task ShowGeneratorOptionsAsync(string? nativesPath, string? gameEventsPath, string? protobufsPath = null, string? datamapsPath = null, string? schemaPath = null, string? steamworksPath = null)
     {
-        var selectedGenerators = AnsiConsole.Prompt(
-            new MultiSelectionPrompt<string>()
-                .Title("Select the [green]generators[/] to run:")
-                .PageSize(10)
-                .MoreChoicesText("[grey](Move up and down to reveal more generators)[/]")
-                .InstructionsText("[grey](Press [blue]<space>[/] to toggle a generator, [green]<enter>[/] to accept)[/]")
-                .AddChoices(GeneratorFactories.Keys)
-        );
+        var selectedGenerators = new List<string>();
+
+        if (!string.IsNullOrEmpty(nativesPath))
+        {
+            selectedGenerators.Add("Natives");
+        }
+
+        if (!string.IsNullOrEmpty(gameEventsPath))
+        {
+            selectedGenerators.Add("Game Events");
+        }
+
+        if (!string.IsNullOrEmpty(protobufsPath))
+        {
+            selectedGenerators.Add("Protobufs");
+        }
+
+        if (!string.IsNullOrEmpty(datamapsPath))
+        {
+            selectedGenerators.Add("Datamaps");
+        }
+
+        if (!string.IsNullOrEmpty(schemaPath))
+        {
+            selectedGenerators.Add("Schemas");
+        }
+
+        if (!string.IsNullOrEmpty(steamworksPath))
+        {
+            selectedGenerators.Add("Steamworks");
+        }
+
+        if (!selectedGenerators.Any())
+        {
+            selectedGenerators = AnsiConsole.Prompt(
+                new MultiSelectionPrompt<string>()
+                    .Title("Select the [green]generators[/] to run:")
+                    .PageSize(10)
+                    .MoreChoicesText("[grey](Move up and down to reveal more generators)[/]")
+                    .InstructionsText("[grey](Press [blue]<space>[/] to toggle a generator, [green]<enter>[/] to accept)[/]")
+                    .AddChoices(GeneratorFactories.Keys)
+            ).ToList();
+        }
 
         if (!selectedGenerators.Any())
         {
@@ -137,12 +173,37 @@ public static class GeneratorOptions
             }
         }
 
+        if (selectedGenerators.Contains("Steamworks") && string.IsNullOrEmpty(steamworksPath))
+        {
+            AnsiConsole.MarkupLine("[yellow]Please browse for steam_api.json file:[/]");
+
+            while (string.IsNullOrEmpty(steamworksPath))
+            {
+                var selectedPath = Entrypoint.BrowseForFile("Browse for steam_api.json", Entrypoint.ProjectRootPath, ".json");
+
+                if (Path.GetFileName(selectedPath).Equals("steam_api.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    steamworksPath = selectedPath;
+                    break;
+                }
+
+                AnsiConsole.MarkupLine($"[red]Selected file is not steam_api.json:[/] {selectedPath}");
+                var useSelectedFile = AnsiConsole.Confirm("Use this file anyway?", false);
+                if (useSelectedFile)
+                {
+                    steamworksPath = selectedPath;
+                }
+            }
+
+            AnsiConsole.MarkupLine($"[green]Selected steam_api.json path:[/] {steamworksPath}");
+        }
+
         AnsiConsole.WriteLine();
         var startTime = DateTime.Now;
 
         var generators = selectedGenerators.ToDictionary(
             name => name,
-            name => GeneratorFactories[name](nativesPath, gameEventsPath, protobufsPath, datamapsPath, schemaPath)
+            name => GeneratorFactories[name](nativesPath, gameEventsPath, protobufsPath, datamapsPath, schemaPath, steamworksPath)
         );
 
         var generatorStatus = new Dictionary<string, GeneratorState>();

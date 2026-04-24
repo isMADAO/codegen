@@ -33,6 +33,8 @@
 
   <ItemGroup>
     <Compile Remove="data\**\*.cs" />
+    <Compile Remove="SteamAPI\**\*.cs" />
+    <Compile Remove="steamworks_generator\**\*.cs" />
     <Compile Remove="**\obj\**\*.cs" />
     <Compile Remove="**\bin\**\*.cs" />
     <Compile Remove="**\output\**\*.cs" />

@@ -74,19 +74,16 @@ public class SchemaGenerator : BaseGenerator
                 var customEntitySystemContent = await File.ReadAllTextAsync(customEntitySystemPath);
                 var customEntitySystemData = JsonSerializer.Deserialize<EntitySystem>(customEntitySystemContent);
 
-                if (customEntitySystemData?.EntityClasses != null)
+                var existingClassNames = new HashSet<string>(entitySystemData.EntityClasses.Select(ec => ec.ClassName));
+                foreach (var customClass in customEntitySystemData!.EntityClasses)
                 {
-                    var existingClassNames = new HashSet<string>(entitySystemData.EntityClasses.Select(ec => ec.ClassName));
-                    foreach (var customClass in customEntitySystemData.EntityClasses)
+                    if (existingClassNames.Contains(customClass.ClassName))
                     {
-                        if (existingClassNames.Contains(customClass.ClassName))
-                        {
-                            entitySystemData.EntityClasses.RemoveAll(ec => ec.ClassName == customClass.ClassName);
-                        }
-                        entitySystemData.EntityClasses.Add(customClass);
+                        entitySystemData.EntityClasses.RemoveAll(ec => ec.ClassName == customClass.ClassName);
                     }
-                    Progress.Report($"Merged {customEntitySystemData.EntityClasses.Count} custom entity classes. Total: {entitySystemData.EntityClasses.Count}");
+                    entitySystemData.EntityClasses.Add(customClass);
                 }
+                Progress.Report($"Merged {customEntitySystemData.EntityClasses.Count} custom entity classes. Total: {entitySystemData.EntityClasses.Count}");
             }
 
             var allClassNames = sdkData.Classes.Select(c => c.Name.Replace(":", "_")).ToList();
